@@ -12,6 +12,8 @@ import { getOne } from '../../services/database';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { INVOICE_STATUS_LABELS } from '../../utils/constants';
+import { VerifactuQR } from '../../components/invoices/VerifactuQR';
+import { generateVerifactuQRUrl } from '../../services/invoiceHash';
 
 const statusColors: Record<string, string> = {
   draft: colors.textLight,
@@ -26,15 +28,25 @@ export function InvoiceDetailScreen({ route }: any) {
   const { user } = useAuth();
   const { getInvoice, updateInvoiceStatus } = useInvoices(user?.id || 0);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [companyNif, setCompanyNif] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     loadInvoice();
+    loadCompanyNif();
   }, [invoiceId]);
 
   const loadInvoice = async () => {
     const inv = await getInvoice(invoiceId);
     setInvoice(inv);
+  };
+
+  const loadCompanyNif = async () => {
+    const company = await getOne<any>(
+      'SELECT nif FROM company_settings WHERE user_id = ?',
+      [user?.id],
+    );
+    if (company) setCompanyNif(company.nif);
   };
 
   const handleSendToAeat = async () => {
@@ -129,6 +141,19 @@ export function InvoiceDetailScreen({ route }: any) {
         <Text style={styles.hashLabel}>Huella:</Text>
         <Text style={styles.hashValue}>{invoice.fingerprint}</Text>
       </Card>
+
+      {companyNif ? (
+        <Card style={styles.section}>
+          <VerifactuQR
+            url={generateVerifactuQRUrl(
+              companyNif,
+              invoice.invoiceNumber,
+              invoice.issueDate,
+              invoice.totalAmount,
+            )}
+          />
+        </Card>
+      ) : null}
 
       {(invoice.status === 'draft' || invoice.status === 'pending') && (
         <View style={styles.actions}>
