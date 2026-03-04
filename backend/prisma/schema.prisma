@@ -1,0 +1,459 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── TENANTS ────────────────────────────────────────────────────────────────
+model Tenant {
+  id              String   @id @default(uuid()) @db.Uuid
+  nif             String   @unique @db.VarChar(20)
+  companyName     String   @map("company_name") @db.VarChar(255)
+  tradeName       String?  @map("trade_name") @db.VarChar(255)
+  addressLine1    String   @map("address_line1") @db.Text
+  postalCode      String   @map("postal_code") @db.VarChar(10)
+  city            String   @db.VarChar(100)
+  state           String?  @db.VarChar(100)
+  country         String   @default("España") @db.VarChar(100)
+  countryCode     String   @default("ES") @map("country_code") @db.VarChar(2)
+  phone           String?  @db.VarChar(20)
+  email           String?  @db.VarChar(255)
+  website         String?  @db.VarChar(255)
+  invoiceSeries   String   @default("F") @map("invoice_series") @db.VarChar(10)
+  saleSeries      String   @default("V") @map("sale_series") @db.VarChar(10)
+  nextInvoiceNum  Int      @default(1) @map("next_invoice_number")
+  nextSaleNum     Int      @default(1) @map("next_sale_number")
+  logoUrl         String?  @map("logo_url") @db.Text
+  isActive        Boolean  @default(true) @map("is_active")
+  legacyId        String?  @map("legacy_id") @db.VarChar(50)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  users               User[]
+  customers           Customer[]
+  suppliers           Supplier[]
+  productFamilies     ProductFamily[]
+  products            Product[]
+  invoices            Invoice[]
+  sales               Sale[]
+  cashSessions        CashSession[]
+  verifactuSubmissions VerifactuSubmission[]
+  accessLogs          AccessLog[]
+
+  @@map("tenants")
+}
+
+// ─── USERS ──────────────────────────────────────────────────────────────────
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  email         String   @db.VarChar(255)
+  name          String   @db.VarChar(255)
+  passwordHash  String   @map("password_hash") @db.VarChar(255)
+  role          String   @default("user") @db.VarChar(20) // admin, user, cashier
+  refreshToken  String?  @map("refresh_token") @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  legacyId      String?  @map("legacy_id") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoicesCreated    Invoice[]     @relation("InvoiceCreatedBy")
+  invoicesUpdated    Invoice[]     @relation("InvoiceUpdatedBy")
+  salesCreated       Sale[]        @relation("SaleCreatedBy")
+  salesUpdated       Sale[]        @relation("SaleUpdatedBy")
+  sessionsOpened     CashSession[] @relation("SessionOpenedBy")
+  sessionsClosed     CashSession[] @relation("SessionClosedBy")
+  accessLogs         AccessLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ─── CUSTOMERS ──────────────────────────────────────────────────────────────
+model Customer {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  code               String    @db.VarChar(20)
+  name               String    @db.VarChar(255)
+  tradeName          String?   @map("trade_name") @db.VarChar(255)
+  taxId              String?   @map("tax_id") @db.VarChar(20)
+  taxIdType          String?   @map("tax_id_type") @db.VarChar(10) // NIF, NIE, CIF, PASSPORT
+  addressLine1       String?   @map("address_line1") @db.Text
+  postalCode         String?   @map("postal_code") @db.VarChar(10)
+  city               String?   @db.VarChar(100)
+  state              String?   @db.VarChar(100)
+  country            String?   @default("España") @db.VarChar(100)
+  countryCode        String?   @default("ES") @map("country_code") @db.VarChar(2)
+  phone              String?   @db.VarChar(20)
+  phone2             String?   @db.VarChar(20)
+  fax                String?   @db.VarChar(20)
+  email              String?   @db.VarChar(255)
+  website            String?   @db.VarChar(255)
+  contactPerson      String?   @map("contact_person") @db.VarChar(255)
+  priceList          Int       @default(1) @map("price_list") // 1-9
+  discountTableId    String?   @map("discount_table_id") @db.Uuid
+  earlyPaymentDisc   Decimal?  @map("early_payment_disc") @db.Decimal(5, 2)
+  paymentTermsId     String?   @map("payment_terms_id") @db.Uuid
+  paymentDay1        Int?      @map("payment_day_1")
+  paymentDay2        Int?      @map("payment_day_2")
+  creditLimit        Decimal?  @map("credit_limit") @db.Decimal(12, 2)
+  iban               String?   @db.VarChar(34)
+  bic                String?   @db.VarChar(11)
+  sepaMandateDate    DateTime? @map("sepa_mandate_date") @db.Date
+  notes              String?   @db.Text
+  isActive           Boolean   @default(true) @map("is_active")
+  legacyId           String?   @map("legacy_id") @db.VarChar(50)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy          String?   @map("created_by") @db.Uuid
+  updatedBy          String?   @map("updated_by") @db.Uuid
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+  sales    Sale[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, taxId])
+  @@map("customers")
+}
+
+// ─── SUPPLIERS ──────────────────────────────────────────────────────────────
+model Supplier {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  code          String   @db.VarChar(20)
+  name          String   @db.VarChar(255)
+  tradeName     String?  @map("trade_name") @db.VarChar(255)
+  taxId         String?  @map("tax_id") @db.VarChar(20)
+  addressLine1  String?  @map("address_line1") @db.Text
+  postalCode    String?  @map("postal_code") @db.VarChar(10)
+  city          String?  @db.VarChar(100)
+  state         String?  @db.VarChar(100)
+  country       String?  @default("España") @db.VarChar(100)
+  countryCode   String?  @default("ES") @map("country_code") @db.VarChar(2)
+  phone         String?  @db.VarChar(20)
+  email         String?  @db.VarChar(255)
+  contactPerson String?  @map("contact_person") @db.VarChar(255)
+  iban          String?  @db.VarChar(34)
+  notes         String?  @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  legacyId      String?  @map("legacy_id") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+// ─── PRODUCT FAMILIES ───────────────────────────────────────────────────────
+model ProductFamily {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(255)
+  parentId    String?  @map("parent_id") @db.Uuid
+  isActive    Boolean  @default(true) @map("is_active")
+  legacyId    String?  @map("legacy_id") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   ProductFamily? @relation("FamilyTree", fields: [parentId], references: [id])
+  children ProductFamily[] @relation("FamilyTree")
+  products Product[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("product_families")
+}
+
+// ─── PRODUCTS ───────────────────────────────────────────────────────────────
+model Product {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  code            String   @db.VarChar(50)
+  name            String   @db.VarChar(255)
+  shortName       String?  @map("short_name") @db.VarChar(50)
+  salePrice       Decimal  @default(0) @map("sale_price") @db.Decimal(12, 2)
+  costPrice       Decimal  @default(0) @map("cost_price") @db.Decimal(12, 2)
+  avgCostPrice    Decimal  @default(0) @map("avg_cost_price") @db.Decimal(12, 2)
+  prices          Json?    @db.JsonB // { "1": 10.00, "2": 9.50, ... }
+  currentStock    Decimal  @default(0) @map("current_stock") @db.Decimal(12, 4)
+  minStock        Decimal  @default(0) @map("min_stock") @db.Decimal(12, 4)
+  maxStock        Decimal  @default(0) @map("max_stock") @db.Decimal(12, 4)
+  optimalStock    Decimal  @default(0) @map("optimal_stock") @db.Decimal(12, 4)
+  trackStock      Boolean  @default(true) @map("track_stock")
+  location        String?  @db.VarChar(100)
+  vatRate         Decimal  @default(21) @map("vat_rate") @db.Decimal(5, 2)
+  familyId        String?  @map("family_id") @db.Uuid
+  tpvColor        String?  @map("tpv_color") @db.VarChar(7)
+  imageUrl        String?  @map("image_url") @db.Text
+  sortOrder       Int      @default(0) @map("sort_order")
+  showInWeb       Boolean  @default(false) @map("show_in_web")
+  webDescription  String?  @map("web_description") @db.Text
+  webShortDesc    String?  @map("web_short_desc") @db.VarChar(500)
+  hasVariants     Boolean  @default(false) @map("has_variants")
+  isActive        Boolean  @default(true) @map("is_active")
+  legacyId        String?  @map("legacy_id") @db.VarChar(50)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  family       ProductFamily? @relation(fields: [familyId], references: [id])
+  invoiceLines InvoiceLine[]
+  saleLines    SaleLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, familyId])
+  @@map("products")
+}
+
+// ─── INVOICES ───────────────────────────────────────────────────────────────
+model Invoice {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
+  series              String    @db.VarChar(10)
+  number              Int
+  invoiceNumber       String    @map("invoice_number") @db.VarChar(50)
+  date                DateTime  @db.Date
+  datetime            DateTime  @default(now()) @db.Timestamptz()
+  // Customer snapshot
+  customerName        String    @map("customer_name") @db.VarChar(255)
+  customerAddress     String?   @map("customer_address") @db.Text
+  customerTaxId       String?   @map("customer_tax_id") @db.VarChar(20)
+  // Totals
+  subtotal            Decimal   @default(0) @db.Decimal(12, 2)
+  discountAmount      Decimal   @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  taxAmount           Decimal   @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total               Decimal   @default(0) @db.Decimal(12, 2)
+  withholdingTax      Decimal   @default(0) @map("withholding_tax") @db.Decimal(12, 2)
+  // Verifactu
+  verifactuHash       String?   @map("verifactu_hash") @db.VarChar(64)
+  verifactuSignature  String?   @map("verifactu_signature") @db.Text
+  verifactuQr         String?   @map("verifactu_qr") @db.Text
+  verifactuQrLabel    String?   @map("verifactu_qr_label") @db.VarChar(255)
+  tbaiId              String?   @map("tbai_id") @db.VarChar(255)
+  verifactuSubmitted  Boolean   @default(false) @map("verifactu_submitted")
+  verifactuStatus     String?   @map("verifactu_status") @db.VarChar(20)
+  // Chaining
+  previousSeries      String?   @map("previous_series") @db.VarChar(10)
+  previousNumber      Int?      @map("previous_number")
+  previousDate        DateTime? @map("previous_date") @db.Date
+  previousHash        String?   @map("previous_hash") @db.VarChar(64)
+  // FACe
+  isPublicEntity      Boolean   @default(false) @map("is_public_entity")
+  faceOffice          String?   @map("face_office") @db.VarChar(50)
+  faceBody            String?   @map("face_body") @db.VarChar(50)
+  faceUnit            String?   @map("face_unit") @db.VarChar(50)
+  faceFileNumber      String?   @map("face_file_number") @db.VarChar(50)
+  // Meta
+  description         String?   @db.Text
+  status              String    @default("draft") @db.VarChar(20)
+  isActive            Boolean   @default(true) @map("is_active")
+  legacyId            String?   @map("legacy_id") @db.VarChar(50)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy           String?   @map("created_by") @db.Uuid
+  updatedBy           String?   @map("updated_by") @db.Uuid
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    Customer      @relation(fields: [customerId], references: [id])
+  createdUser User?         @relation("InvoiceCreatedBy", fields: [createdBy], references: [id])
+  updatedUser User?         @relation("InvoiceUpdatedBy", fields: [updatedBy], references: [id])
+  lines       InvoiceLine[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, customerId])
+  @@map("invoices")
+}
+
+// ─── INVOICE LINES ──────────────────────────────────────────────────────────
+model InvoiceLine {
+  id              String  @id @default(uuid()) @db.Uuid
+  invoiceId       String  @map("invoice_id") @db.Uuid
+  productId       String? @map("product_id") @db.Uuid
+  description     String  @db.Text
+  quantity        Decimal @db.Decimal(12, 4)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(12, 2)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  taxRate         Decimal @map("tax_rate") @db.Decimal(5, 2)
+  lineTotal       Decimal @map("line_total") @db.Decimal(12, 2)
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+// ─── SALES (TICKETS) ────────────────────────────────────────────────────────
+model Sale {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  customerId          String?   @map("customer_id") @db.Uuid
+  number              String    @db.VarChar(50)  // V-2026-00001
+  series              String    @db.VarChar(10)
+  sequenceNum         Int       @map("sequence_num")
+  date                DateTime  @db.Date
+  datetime            DateTime  @default(now()) @db.Timestamptz()
+  // Totals
+  subtotal            Decimal   @default(0) @db.Decimal(12, 2)
+  discountAmount      Decimal   @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  taxAmount           Decimal   @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total               Decimal   @default(0) @db.Decimal(12, 2)
+  // Payment
+  paymentMethod       String?   @map("payment_method") @db.VarChar(20)
+  payments            Json?     @db.JsonB // [{ method: "cash", amount: 10 }, ...]
+  // Verifactu
+  verifactuHash       String?   @map("verifactu_hash") @db.VarChar(64)
+  verifactuSignature  String?   @map("verifactu_signature") @db.Text
+  verifactuQr         String?   @map("verifactu_qr") @db.Text
+  tbaiId              String?   @map("tbai_id") @db.VarChar(255)
+  verifactuSubmitted  Boolean   @default(false) @map("verifactu_submitted")
+  verifactuStatus     String?   @map("verifactu_status") @db.VarChar(20)
+  previousHash        String?   @map("previous_hash") @db.VarChar(64)
+  // Cash session
+  cashSessionId       String?   @map("cash_session_id") @db.Uuid
+  // Meta
+  status              String    @default("completed") @db.VarChar(20)
+  isActive            Boolean   @default(true) @map("is_active")
+  legacyId            String?   @map("legacy_id") @db.VarChar(50)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  createdBy           String?   @map("created_by") @db.Uuid
+  updatedBy           String?   @map("updated_by") @db.Uuid
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id])
+  createdUser  User?        @relation("SaleCreatedBy", fields: [createdBy], references: [id])
+  updatedUser  User?        @relation("SaleUpdatedBy", fields: [updatedBy], references: [id])
+  cashSession  CashSession? @relation(fields: [cashSessionId], references: [id])
+  lines        SaleLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@map("sales")
+}
+
+// ─── SALE LINES ─────────────────────────────────────────────────────────────
+model SaleLine {
+  id              String  @id @default(uuid()) @db.Uuid
+  saleId          String  @map("sale_id") @db.Uuid
+  productId       String? @map("product_id") @db.Uuid
+  description     String  @db.Text
+  quantity        Decimal @db.Decimal(12, 4)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(12, 2)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  taxRate         Decimal @map("tax_rate") @db.Decimal(5, 2)
+  lineTotal       Decimal @map("line_total") @db.Decimal(12, 2)
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@map("sale_lines")
+}
+
+// ─── CASH SESSIONS ──────────────────────────────────────────────────────────
+model CashSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  terminalId     String    @default("TPV-1") @map("terminal_id") @db.VarChar(50)
+  openedAt       DateTime  @default(now()) @map("opened_at") @db.Timestamptz()
+  closedAt       DateTime? @map("closed_at") @db.Timestamptz()
+  openedById     String    @map("opened_by") @db.Uuid
+  closedById     String?   @map("closed_by") @db.Uuid
+  openingAmount  Decimal   @default(0) @map("opening_amount") @db.Decimal(12, 2)
+  closingAmount  Decimal?  @map("closing_amount") @db.Decimal(12, 2)
+  expectedCash   Decimal?  @map("expected_cash") @db.Decimal(12, 2)
+  difference     Decimal?  @db.Decimal(12, 2)
+  totalCash      Decimal   @default(0) @map("total_cash") @db.Decimal(12, 2)
+  totalCard      Decimal   @default(0) @map("total_card") @db.Decimal(12, 2)
+  totals         Json?     @db.JsonB // other payment methods
+  numSales       Int       @default(0) @map("num_sales")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  openedBy  User    @relation("SessionOpenedBy", fields: [openedById], references: [id])
+  closedBy  User?   @relation("SessionClosedBy", fields: [closedById], references: [id])
+  sales     Sale[]
+
+  @@index([tenantId])
+  @@map("cash_sessions")
+}
+
+// ─── VERIFACTU SUBMISSIONS ──────────────────────────────────────────────────
+model VerifactuSubmission {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  environment     String    @default("test") @db.VarChar(10) // test, prod
+  operationType   String    @map("operation_type") @db.VarChar(20) // alta, anulacion
+  documentType    String    @map("document_type") @db.VarChar(20) // invoice, sale
+  documentId      String    @map("document_id") @db.Uuid
+  documentNumber  String    @map("document_number") @db.VarChar(50)
+  documentDate    DateTime  @map("document_date") @db.Date
+  series          String    @db.VarChar(10)
+  number          Int
+  submissionId    String?   @map("submission_id") @db.VarChar(255)
+  qrContent       String?   @map("qr_content") @db.Text
+  verifactuId     String?   @map("verifactu_id") @db.VarChar(255)
+  receivedAt      DateTime? @map("received_at") @db.Timestamptz()
+  status          String    @default("pending") @db.VarChar(20)
+  description     String?   @db.Text
+  csvCode         String?   @map("csv_code") @db.VarChar(50)
+  responseXml     String?   @map("response_xml") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, documentType, documentId])
+  @@map("verifactu_submissions")
+}
+
+// ─── ACCESS LOGS (Kit Digital) ──────────────────────────────────────────────
+model AccessLog {
+  id            BigInt   @id @default(autoincrement())
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  userId        String?  @map("user_id") @db.Uuid
+  userEmail     String?  @map("user_email") @db.VarChar(255)
+  userName      String?  @map("user_name") @db.VarChar(255)
+  eventType     String   @map("event_type") @db.VarChar(50)
+  ipAddress     String?  @map("ip_address") @db.VarChar(45)
+  userAgent     String?  @map("user_agent") @db.Text
+  deviceType    String?  @map("device_type") @db.VarChar(20)
+  success       Boolean  @default(true)
+  referenceId   String?  @map("reference_id") @db.Uuid
+  referenceType String?  @map("reference_type") @db.VarChar(50)
+  description   String?  @db.Text
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([eventType])
+  @@map("access_logs")
+}
