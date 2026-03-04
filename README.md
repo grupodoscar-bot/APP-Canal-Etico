@@ -1,54 +1,73 @@
-# Verifactu - Facturación Electrónica
+# VERIFACTU
 
-Aplicación móvil React Native para gestión completa de facturación electrónica, cumpliendo con la normativa española **VERI*FACTU** (Real Decreto 1007/2023).
+Sistema de facturación electrónica compatible con **VERI*FACTU** de la AEAT (Real Decreto 1007/2023).
 
-## Características
+Sustituye al software DOSCAR.
 
-- **Facturación electrónica**: Crea y gestiona facturas con cumplimiento Verifactu
-- **Hash SHA-256 encadenado**: Integridad y trazabilidad de registros de facturación
-- **Comunicación AEAT**: Envío de registros al sistema de la Agencia Tributaria
-- **Gestión de clientes**: CRUD completo con validación de NIF/CIF español
-- **Gestión de productos**: Catálogo con tipos de IVA (21%, 10%, 4%, 0%)
-- **Dashboard**: Panel de control con resumen y estadísticas
-- **Almacenamiento local**: SQLite para persistencia de datos
-- **Autenticación**: Login y registro con contraseñas encriptadas
+**Dominio:** [verifactu.red](https://verifactu.red)
 
-## Tecnologías
+## Arquitectura
 
-- React Native 0.73
-- TypeScript
-- React Navigation
-- SQLite (react-native-sqlite-storage)
-- CryptoJS (SHA-256)
-- React Native Paper
+```
+verifactu/
+├── mobile/     # App móvil TPV (React Native)
+├── backend/    # API y servicios (pendiente)
+├── web/        # Panel web (pendiente)
+└── docs/       # Documentación
+```
 
-## Instalación
+## Mobile (App TPV)
+
+App React Native + TypeScript para gestión de facturación desde dispositivos móviles.
+
+### Funcionalidades implementadas
+
+- Autenticación local con contraseñas encriptadas (SHA-256)
+- Base de datos SQLite local
+- Gestión de clientes con validación NIF/NIE/CIF
+- Gestión de productos con tipos de IVA (21%, 10%, 4%, 0%)
+- Creación de facturas con líneas, cálculo automático de totales
+- Hash encadenado SHA-256: `SHA256(previous_hash + series + number + date + total)`
+- Campo `verifactu_qr` persistido en BD con URL de verificación AEAT
+- Código QR Verifactu en pantalla de detalle (react-native-qrcode-svg)
+- Generación de PDF de factura (react-native-html-to-pdf)
+- Generación XML SuministroLRFacturasEmitidas para AEAT
+- Dashboard con resumen y estadísticas
+- Navegación Tab + Stack con React Navigation
+
+### Instalación
 
 ```bash
+cd mobile
 npm install
 npx react-native run-android  # Android
 npx react-native run-ios      # iOS
 ```
 
-## Estructura
+### Estructura mobile/
 
 ```
-src/
-├── navigation/     # Navegación (Tab + Stack)
-├── screens/        # Pantallas (auth, dashboard, invoices, clients, products, settings)
-├── components/     # Componentes reutilizables
-├── services/       # Base de datos, autenticación, AEAT, hash
-├── models/         # Tipos TypeScript
-├── hooks/          # Custom hooks
-├── context/        # Context de autenticación
-├── utils/          # Utilidades (validadores, formateadores, constantes)
-└── theme/          # Tema visual
+mobile/
+├── App.tsx
+├── package.json
+├── src/
+│   ├── navigation/     # Navegación (Tab + Stack)
+│   ├── screens/        # auth, dashboard, invoices, clients, products, settings
+│   ├── components/     # Button, Input, Card, InvoiceCard, VerifactuQR...
+│   ├── services/       # database, auth, aeat, invoiceHash, pdf
+│   ├── models/         # Invoice, Client, Product, User
+│   ├── hooks/          # useInvoices, useClients, useProducts
+│   ├── context/        # AuthContext
+│   ├── utils/          # validators, formatters, constants
+│   └── theme/          # Colores, tipografía, espaciado
 ```
 
-## Cumplimiento Verifactu
+## Cumplimiento Verifactu (RD 1007/2023)
 
 - Encadenamiento hash SHA-256 entre facturas
-- Generación de huella (fingerprint) por registro
-- Formato XML SuministroLRFacturasEmitidas para AEAT
-- Validación de NIF/CIF español
-- Numeración secuencial de facturas por serie
+- Huella (fingerprint) por registro
+- QR de verificación con URL AEAT
+- Formato XML SuministroLRFacturasEmitidas
+- Validación de NIF/NIE/CIF español
+- Numeración secuencial por serie
+- Registros inmutables y trazables
