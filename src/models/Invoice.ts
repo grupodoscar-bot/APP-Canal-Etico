@@ -31,6 +31,7 @@ export interface Invoice {
   hash: string;
   previousHash: string;
   fingerprint: string;
+  verifactuQr: string;
   aeatResponseCode?: string;
   aeatResponseMessage?: string;
   sentToAeatAt?: string;

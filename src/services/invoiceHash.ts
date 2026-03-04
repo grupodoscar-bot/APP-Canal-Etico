@@ -1,37 +1,20 @@
 import CryptoJS from 'crypto-js';
-import { Invoice } from '../models/Invoice';
 
 /**
  * Generates a SHA-256 hash for a Verifactu invoice record.
+ * Algorithm: SHA256(previous_hash + series + number + date + total)
+ *
  * The hash chains to the previous invoice's hash to ensure
  * integrity and traceability (Real Decreto 1007/2023).
- *
- * Fields included in hash calculation:
- * - NIF emisor
- * - Número de factura
- * - Fecha de expedición
- * - Tipo factura
- * - Base imponible
- * - Total factura
- * - Hash de la factura anterior
  */
 export function generateInvoiceHash(
-  emitterNif: string,
-  invoiceNumber: string,
-  issueDate: string,
-  taxBase: number,
-  totalAmount: number,
   previousHash: string,
+  series: string,
+  number: number,
+  issueDate: string,
+  totalAmount: number,
 ): string {
-  const dataToHash = [
-    emitterNif,
-    invoiceNumber,
-    issueDate,
-    taxBase.toFixed(2),
-    totalAmount.toFixed(2),
-    previousHash,
-  ].join('|');
-
+  const dataToHash = `${previousHash}${series}${number}${issueDate}${totalAmount.toFixed(2)}`;
   return CryptoJS.SHA256(dataToHash).toString();
 }
 
@@ -50,18 +33,7 @@ export function generateFingerprint(
 }
 
 /**
- * Gets the last invoice hash for chaining.
- * Returns empty string if this is the first invoice.
- */
-export async function getLastInvoiceHash(
-  getLastInvoiceFn: () => Promise<Invoice | null>,
-): Promise<string> {
-  const lastInvoice = await getLastInvoiceFn();
-  return lastInvoice?.hash ?? '';
-}
-
-/**
- * Generates a Verifactu QR code URL for invoice verification.
+ * Generates a Verifactu QR code URL for invoice verification at AEAT.
  */
 export function generateVerifactuQRUrl(
   nif: string,

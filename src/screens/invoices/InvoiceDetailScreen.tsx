@@ -13,7 +13,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { INVOICE_STATUS_LABELS } from '../../utils/constants';
 import { VerifactuQR } from '../../components/invoices/VerifactuQR';
-import { generateVerifactuQRUrl } from '../../services/invoiceHash';
+import { generateInvoicePdf } from '../../services/pdf';
 
 const statusColors: Record<string, string> = {
   draft: colors.textLight,
@@ -28,12 +28,13 @@ export function InvoiceDetailScreen({ route }: any) {
   const { user } = useAuth();
   const { getInvoice, updateInvoiceStatus } = useInvoices(user?.id || 0);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [companyNif, setCompanyNif] = useState('');
+  const [company, setCompany] = useState<any>(null);
   const [sending, setSending] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     loadInvoice();
-    loadCompanyNif();
+    loadCompany();
   }, [invoiceId]);
 
   const loadInvoice = async () => {
@@ -41,12 +42,12 @@ export function InvoiceDetailScreen({ route }: any) {
     setInvoice(inv);
   };
 
-  const loadCompanyNif = async () => {
-    const company = await getOne<any>(
-      'SELECT nif FROM company_settings WHERE user_id = ?',
+  const loadCompany = async () => {
+    const c = await getOne<any>(
+      'SELECT * FROM company_settings WHERE user_id = ?',
       [user?.id],
     );
-    if (company) setCompanyNif(company.nif);
+    if (c) setCompany(c);
   };
 
   const handleSendToAeat = async () => {
@@ -62,10 +63,6 @@ export function InvoiceDetailScreen({ route }: any) {
           onPress: async () => {
             setSending(true);
             try {
-              const company = await getOne<any>(
-                'SELECT * FROM company_settings WHERE user_id = ?',
-                [user?.id],
-              );
               if (!company) {
                 Alert.alert('Error', 'Configura los datos de tu empresa en Ajustes');
                 return;
@@ -87,6 +84,22 @@ export function InvoiceDetailScreen({ route }: any) {
         },
       ],
     );
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!invoice || !company) {
+      Alert.alert('Error', 'Configura los datos de tu empresa en Ajustes');
+      return;
+    }
+    setGeneratingPdf(true);
+    try {
+      const filePath = await generateInvoicePdf(invoice, company);
+      Alert.alert('PDF generado', `Factura guardada en:\n${filePath}`);
+    } catch (e: any) {
+      Alert.alert('Error al generar PDF', e.message);
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   if (!invoice) return <View style={styles.loading}><Text>Cargando...</Text></View>;
@@ -142,28 +155,29 @@ export function InvoiceDetailScreen({ route }: any) {
         <Text style={styles.hashValue}>{invoice.fingerprint}</Text>
       </Card>
 
-      {companyNif ? (
+      {invoice.verifactuQr ? (
         <Card style={styles.section}>
-          <VerifactuQR
-            url={generateVerifactuQRUrl(
-              companyNif,
-              invoice.invoiceNumber,
-              invoice.issueDate,
-              invoice.totalAmount,
-            )}
-          />
+          <VerifactuQR url={invoice.verifactuQr} />
         </Card>
       ) : null}
 
-      {(invoice.status === 'draft' || invoice.status === 'pending') && (
-        <View style={styles.actions}>
+      <View style={styles.actions}>
+        {(invoice.status === 'draft' || invoice.status === 'pending') && (
           <Button
             title="Enviar a AEAT (pruebas)"
             onPress={handleSendToAeat}
             loading={sending}
+            style={styles.actionBtn}
           />
-        </View>
-      )}
+        )}
+        <Button
+          title="Descargar PDF"
+          onPress={handleDownloadPdf}
+          variant="outline"
+          loading={generatingPdf}
+          style={styles.actionBtn}
+        />
+      </View>
 
       {invoice.aeatResponseMessage && (
         <Card style={styles.section}>
@@ -260,6 +274,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     padding: spacing.md,
+    gap: spacing.sm,
+  },
+  actionBtn: {
+    marginBottom: 0,
   },
   aeatResponse: {
     ...typography.body,

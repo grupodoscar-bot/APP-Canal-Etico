@@ -101,6 +101,7 @@ async function initDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
       hash TEXT NOT NULL,
       previous_hash TEXT DEFAULT '',
       fingerprint TEXT NOT NULL,
+      verifactu_qr TEXT NOT NULL DEFAULT '',
       aeat_response_code TEXT,
       aeat_response_message TEXT,
       sent_to_aeat_at TEXT,

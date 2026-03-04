@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Invoice, InvoiceLine } from '../models/Invoice';
 import { getAll, executeSql, getOne } from '../services/database';
-import { generateInvoiceHash, generateFingerprint } from '../services/invoiceHash';
+import { generateInvoiceHash, generateFingerprint, generateVerifactuQRUrl } from '../services/invoiceHash';
 import { formatInvoiceNumber, roundToTwo } from '../utils/formatters';
 
 export function useInvoices(userId: number) {
@@ -55,20 +55,21 @@ export function useInvoices(userId: number) {
     const lastInvoice = await getLastInvoice();
     const previousHash = lastInvoice?.hash || '';
 
-    // Generate Verifactu hash
-    const hash = generateInvoiceHash(
-      emitterNif, invoiceNumber, issueDate, taxBase, totalAmount, previousHash,
-    );
+    // Generate Verifactu hash: SHA256(previous_hash + series + number + date + total)
+    const hash = generateInvoiceHash(previousHash, series, number, issueDate, totalAmount);
     const fingerprint = generateFingerprint(emitterNif, invoiceNumber, issueDate, hash);
+
+    // Generate Verifactu QR URL and store it
+    const verifactuQr = generateVerifactuQRUrl(emitterNif, invoiceNumber, issueDate, totalAmount);
 
     // Insert invoice
     const result = await executeSql(
       `INSERT INTO invoices (user_id, client_id, series, number, invoice_number,
        issue_date, description, tax_base, total_vat, total_amount, status,
-       hash, previous_hash, fingerprint)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+       hash, previous_hash, fingerprint, verifactu_qr)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
       [userId, clientId, series, number, invoiceNumber, issueDate, description,
-       taxBase, totalVat, totalAmount, hash, previousHash, fingerprint],
+       taxBase, totalVat, totalAmount, hash, previousHash, fingerprint, verifactuQr],
     );
     const invoiceId = result.insertId;
 
@@ -152,6 +153,7 @@ function mapRowToInvoice(row: any): Invoice {
     hash: row.hash,
     previousHash: row.previous_hash,
     fingerprint: row.fingerprint,
+    verifactuQr: row.verifactu_qr,
     aeatResponseCode: row.aeat_response_code,
     aeatResponseMessage: row.aeat_response_message,
     sentToAeatAt: row.sent_to_aeat_at,
